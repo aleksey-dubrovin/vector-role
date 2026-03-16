@@ -1,2 +1,2 @@
 # vector-role
-Роль для развертывания конвейера данных Vector через ansible playbook
+Роль ansible playbook для развертывания конвейера данных Vector
