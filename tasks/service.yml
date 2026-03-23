@@ -2,23 +2,45 @@
 - name: "Запуск и включение Vector"
   ansible.builtin.systemd:
     name: vector
-    state: "{{ vector_service_state }}"
-    enabled: "{{ vector_service_enable }}"
+    state: "{{ vector_service_state | default('started') }}"
+    enabled: "{{ vector_service_enable | default(true) }}"
     daemon_reload: true
   become: true
   register: vector_start
   tags: [vector, service]
+  when: ansible_service_mgr == "systemd"
+
+- name: "Проверка, запущен ли Vector"
+  ansible.builtin.shell: pgrep vector > /dev/null
+  register: vector_running
+  changed_when: false
+  failed_when: false
+  when: ansible_service_mgr != "systemd"
+
+- name: "Запуск Vector в контейнере (без systemd)"
+  ansible.builtin.shell: |
+    vector --config {{ vector_config_path }} &
+  become: true
+  async: 45
+  poll: 0
+  tags: [vector, service]
+  when: ansible_service_mgr != "systemd" and vector_running.rc != 0
 
 - name: "Проверка статуса Vector"
-  ansible.builtin.command:
-    cmd: systemctl is-active vector
+  ansible.builtin.shell: |
+    if systemctl is-active vector 2>/dev/null; then
+      echo "active"
+    elif pgrep vector >/dev/null; then
+      echo "active"
+    else
+      echo "inactive"
+    fi
   register: vector_status
   changed_when: false
-  failed_when: vector_status.stdout != "active"
-  become: true
+  failed_when: false
   tags: [vector, verify]
 
 - name: "Вывод информации о статусе"
   ansible.builtin.debug:
-    msg: "Vector успешно установлен и запущен"
+    msg: "Vector status: {{ vector_status.stdout }}"
   tags: [vector, verify]

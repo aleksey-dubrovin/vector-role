@@ -4,10 +4,11 @@ dependency:
 driver:
   name: podman
 platforms:
-  - name: ubuntu
-    image: docker.io/pycontribs/ubuntu:latest
+  - name: ubuntu-py
+    image: pycontribs/ubuntu:latest
     pre_build_image: true
     privileged: true
+    ansible_user: root
 provisioner:
   name: ansible
   config_options:

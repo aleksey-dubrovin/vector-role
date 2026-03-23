@@ -11,43 +11,48 @@
   become: true
   tags: [vector, configure]
 
-- name: "Создание systemd override директории"
-  ansible.builtin.file:
-    path: /etc/systemd/system/vector.service.d
-    state: directory
-    mode: '0755'
+- name: "Настройка Systemd (только для систем с systemd)"
+  block:
+    - name: "Создание systemd override директории"
+      ansible.builtin.file:
+        path: /etc/systemd/system/vector.service.d
+        state: directory
+        mode: '0755'
+
+    - name: "Создание systemd override для YAML конфига"
+      ansible.builtin.copy:
+        content: |
+          [Service]
+          ExecStartPre=
+          ExecStartPre=/usr/bin/vector validate --config-yaml {{ vector_config_path }} --no-environment
+          ExecStart=
+          ExecStart=/usr/bin/vector --config-yaml {{ vector_config_path }}
+        dest: /etc/systemd/system/vector.service.d/override.conf
+        mode: '0644'
+      notify: restart vector
+
+    - name: "Перезагрузка systemd"
+      ansible.builtin.systemd:
+        daemon_reload: true
   become: true
   tags: [vector, systemd]
+  when: ansible_service_mgr == "systemd"
 
-- name: "Создание systemd override для YAML конфига"
-  ansible.builtin.copy:
-    content: |
-      [Service]
-      ExecStartPre=
-      ExecStartPre=/usr/bin/vector validate --config-yaml {{ vector_config_path }} --no-environment
-      ExecStart=
-      ExecStart=/usr/bin/vector --config-yaml {{ vector_config_path }}
-    dest: /etc/systemd/system/vector.service.d/override.conf
-    mode: '0644'
-  notify: restart vector
-  become: true
-  tags: [vector, systemd]
-
-- name: "Настройка прав на логи"
-  ansible.builtin.file:
+- name: "Проверка наличия файлов логов"
+  ansible.builtin.stat:
     path: "{{ item }}"
-    mode: '0640'
-    owner: root
-    group: adm
+  register: log_stats
   loop:
     - /var/log/messages
     - /var/log/secure
-  ignore_errors: true
-  become: true
   tags: [vector, permissions]
 
-- name: "Перезагрузка systemd"
-  ansible.builtin.systemd:
-    daemon_reload: true
+- name: "Настройка прав на логи"
+  ansible.builtin.file:
+    path: "{{ item.stat.path }}"
+    mode: '0640'
+    owner: root
+    group: "{{ 'adm' if ansible_os_family == 'Debian' else 'root' }}"
+  loop: "{{ log_stats.results | selectattr('stat.exists', 'equalto', true) | list }}"
   become: true
-  tags: [vector, systemd]
+  tags: [vector, permissions]

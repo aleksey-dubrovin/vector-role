@@ -1,9 +1,12 @@
 ---
 - name: "Установка Vector"
   ansible.builtin.include_tasks: install.yml
+  tags: [vector, install]
 
 - name: "Настройка Vector"
   ansible.builtin.include_tasks: configure.yml
+  tags: [vector, configure]
 
 - name: "Запуск Vector"
   ansible.builtin.include_tasks: service.yml
+  tags: [vector, service]

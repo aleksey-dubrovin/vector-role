@@ -6,3 +6,10 @@
     daemon_reload: true
     enabled: true
   become: true
+  when: ansible_service_mgr == "systemd"
+
+- name: restart vector (контейнер)
+  ansible.builtin.shell: pkill vector || true
+  become: true
+  ignore_errors: true
+  when: ansible_service_mgr != "systemd"

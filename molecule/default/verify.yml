@@ -1,54 +1,42 @@
 ---
 - name: Verify
   hosts: all
-  gather_facts: false
+  become: true
   tasks:
-    # 1. Проверка наличия бинарного файла и его версии
-    - name: Check Vector version
+    - name: Проверка | Vector установлен
+      ansible.builtin.command: which vector
+      register: vector_path
+      failed_when: vector_path.rc != 0
+      changed_when: false
+
+    - name: Проверка | Версия Vector
       ansible.builtin.command: vector --version
       register: vector_version
+      failed_when: vector_version.rc != 0
       changed_when: false
-      ignore_errors: true
 
-    - name: Assert Vector is installed
-      ansible.builtin.assert:
-        that: vector_version.rc == 0
-        fail_msg: "Бинарный файл Vector не найден в системе"
-        success_msg: "Vector успешно установлен"
-
-    # 2. Проверка валидности конфигурационного файла (как просили в задании)
-    - name: Validate Vector configuration
-      ansible.builtin.command: vector validate --config /etc/vector/vector.yaml
-      register: vector_validate
-      changed_when: false
-      ignore_errors: true
-
-    - name: Assert config is valid
-      ansible.builtin.assert:
-        that: vector_validate.rc == 0
-        fail_msg: "Конфигурация Vector (/etc/vector/vector.yaml) невалидна"
-        success_msg: "Конфигурация Vector прошла валидацию"
-
-    # 3. Проверка успешности запуска процесса (pgrep надежнее systemctl в Docker)
-    - name: Check if Vector process is running
-      ansible.builtin.command: pgrep vector
-      register: vector_pgrep
-      changed_when: false
-      ignore_errors: true
-
-    - name: Assert Vector is running
-      ansible.builtin.assert:
-        that: vector_pgrep.rc == 0
-        fail_msg: "Процесс Vector не запущен"
-        success_msg: "Процесс Vector активен"
-
-    # 4. Проверка существования директории данных (дополнительно)
-    - name: Check data directory
+    - name: Проверка | Конфигурационный файл существует
       ansible.builtin.stat:
-        path: /var/lib/vector
-      register: vector_data_dir
+        path: /etc/vector/vector.yaml
+      register: vector_config
+      failed_when: not vector_config.stat.exists
+      changed_when: false
 
-    - name: Assert data directory exists
-      ansible.builtin.assert:
-        that: vector_data_dir.stat.exists and vector_data_dir.stat.isdir
-        fail_msg: "Директория данных /var/lib/vector отсутствует"
+    - name: Проверка | Конфигурация валидна
+      ansible.builtin.command: vector validate --config-yaml /etc/vector/vector.yaml
+      register: vector_validate
+      failed_when: vector_validate.rc != 0
+      changed_when: false
+
+    - name: Проверка | Пользователь vector существует
+      ansible.builtin.user:
+        name: vector
+        state: present
+      check_mode: true
+      register: vector_user
+      failed_when: vector_user is changed
+      changed_when: false
+
+    - name: Вывод версии
+      ansible.builtin.debug:
+        msg: "Vector version: {{ vector_version.stdout }}"

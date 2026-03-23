@@ -1,50 +1,47 @@
 ---
-- name: "Обновление системы (RedHat)"
-  ansible.builtin.dnf:
+- name: "Обновление системы"
+  ansible.builtin.package:
     name: "*"
     state: latest
     update_cache: true
   become: true
   tags: [vector, update]
-  when: ansible_os_family == "RedHat"
 
-- name: "Обновление системы (Ubuntu)"
-  ansible.builtin.apt:
-    name: "*"
-    state: latest
-    update_cache: true
-  become: true
-  tags: [vector, update]
-  when: ansible_os_family == "Debian"
-
-- name: "Установка необходимых пакетов (RedHat)"
-  ansible.builtin.dnf:
+- name: "Установка необходимых пакетов"
+  ansible.builtin.package:
     name:
       - curl
       - wget
       - python3
       - python3-pip
+    state: present
+    update_cache: true
+  become: true
+  tags: [vector, packages]
+
+- name: "Установка специфичных пакетов (RedHat)"
+  ansible.builtin.package:
+    name:
       - python3-libselinux
       - policycoreutils-python-utils
     state: present
-    update_cache: true
   become: true
   tags: [vector, packages]
   when: ansible_os_family == "RedHat"
 
-- name: "Установка необходимых пакетов (Ubuntu)"
-  ansible.builtin.apt:
-    name:
-      - curl
-      - wget
-      - python3
-      - python3-pip
-      - python3-venv
+- name: "Установка специфичных пакетов (Ubuntu)"
+  ansible.builtin.package:
+    name: python3-venv
     state: present
-    update_cache: true
   become: true
   tags: [vector, packages]
   when: ansible_os_family == "Debian"
+
+- name: "Проверка существования RPM файла"
+  ansible.builtin.stat:
+    path: "/tmp/vector-{{ vector_version }}-1.x86_64.rpm"
+  register: rpm_file
+  when: ansible_os_family == "RedHat"
 
 - name: "Скачивание Vector (RedHat)"
   ansible.builtin.get_url:
@@ -59,7 +56,13 @@
   delay: 10
   become: true
   tags: [vector, download]
-  when: ansible_os_family == "RedHat"
+  when: ansible_os_family == "RedHat" and not rpm_file.stat.exists
+
+- name: "Проверка существования DEB файла"
+  ansible.builtin.stat:
+    path: "/tmp/vector_{{ vector_version }}-1_amd64.deb"
+  register: deb_file
+  when: ansible_os_family == "Debian"
 
 - name: "Скачивание Vector (Ubuntu)"
   ansible.builtin.get_url:
@@ -74,6 +77,14 @@
   delay: 10
   become: true
   tags: [vector, download]
+  when: ansible_os_family == "Debian" and not deb_file.stat.exists
+
+- name: "Установка Vector (Ubuntu)"
+  ansible.builtin.apt:
+    deb: "/tmp/vector_{{ vector_version }}-1_amd64.deb"
+    state: present
+  become: true
+  tags: [vector, install]
   when: ansible_os_family == "Debian"
 
 - name: "Установка Vector (RedHat)"
@@ -85,14 +96,6 @@
   tags: [vector, install]
   when: ansible_os_family == "RedHat"
 
-- name: "Установка Vector (Ubuntu)"
-  ansible.builtin.apt:
-    deb: "/tmp/vector_{{ vector_version }}-1_amd64.deb"
-    state: present
-  become: true
-  tags: [vector, install]
-  when: ansible_os_family == "Debian"
-
 - name: "Создание пользователя vector"
   ansible.builtin.user:
     name: "{{ vector_user }}"
@@ -101,14 +104,6 @@
     create_home: false
   become: true
   tags: [vector, user]
-
-- name: "Добавление пользователя vector в группу adm"
-  ansible.builtin.user:
-    name: "{{ vector_user }}"
-    groups: adm
-    append: true
-  become: true
-  tags: [vector, permissions]
 
 - name: "Создание директорий Vector"
   ansible.builtin.file:
@@ -123,18 +118,16 @@
   become: true
   tags: [vector, directories]
 
-- name: "Очистка временного файла (RedHat)"
+- name: "Настройка прав на логи (RedHat)"
   ansible.builtin.file:
-    path: "/tmp/vector-{{ vector_version }}-1.x86_64.rpm"
-    state: absent
+    path: "{{ item }}"
+    mode: '0640'
+    owner: root
+    group: adm
+  loop:
+    - /var/log/messages
+    - /var/log/secure
+  ignore_errors: true
   become: true
-  tags: [vector, cleanup]
+  tags: [vector, permissions]
   when: ansible_os_family == "RedHat"
-
-- name: "Очистка временного файла (Ubuntu)"
-  ansible.builtin.file:
-    path: "/tmp/vector_{{ vector_version }}-1_amd64.deb"
-    state: absent
-  become: true
-  tags: [vector, cleanup]
-  when: ansible_os_family == "Debian"
