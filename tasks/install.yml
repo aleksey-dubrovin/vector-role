@@ -46,9 +46,9 @@
   tags: [vector, packages]
   when: ansible_os_family == "Debian"
 
-- name: "Скачивание Vector (RedHat) - GitHub Releases"
+- name: "Скачивание Vector (RedHat)"
   ansible.builtin.get_url:
-    url: "https://github.com/vectordotdev/vector/releases/download/v{{ vector_version }}/vector-{{ vector_version }}-1.x86_64.rpm"
+    url: "https://packages.timber.io/vector/{{ vector_version }}/vector-{{ vector_version }}-1.x86_64.rpm"
     dest: "/tmp/vector-{{ vector_version }}-1.x86_64.rpm"
     mode: '0644'
     validate_certs: true
@@ -61,10 +61,10 @@
   tags: [vector, download]
   when: ansible_os_family == "RedHat"
 
-- name: "Скачивание Vector (Ubuntu) - GitHub Releases"
+- name: "Скачивание Vector (Ubuntu)"
   ansible.builtin.get_url:
-    url: "https://github.com/vectordotdev/vector/releases/download/v{{ vector_version }}/vector-{{ vector_version }}-amd64.deb"
-    dest: "/tmp/vector-{{ vector_version }}-amd64.deb"
+    url: "https://packages.timber.io/vector/{{ vector_version }}/vector_{{ vector_version }}-1_amd64.deb"
+    dest: "/tmp/vector_{{ vector_version }}-1_amd64.deb"
     mode: '0644'
     validate_certs: true
     timeout: 60
@@ -87,7 +87,7 @@
 
 - name: "Установка Vector (Ubuntu)"
   ansible.builtin.apt:
-    deb: "/tmp/vector-{{ vector_version }}-amd64.deb"
+    deb: "/tmp/vector_{{ vector_version }}-1_amd64.deb"
     state: present
   become: true
   tags: [vector, install]
@@ -133,7 +133,7 @@
 
 - name: "Очистка временного файла (Ubuntu)"
   ansible.builtin.file:
-    path: "/tmp/vector-{{ vector_version }}-amd64.deb"
+    path: "/tmp/vector_{{ vector_version }}-1_amd64.deb"
     state: absent
   become: true
   tags: [vector, cleanup]
